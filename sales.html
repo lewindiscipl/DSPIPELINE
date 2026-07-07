@@ -1,0 +1,91 @@
+/* =========================================================
+   DISCIPL SCREENS — sales lead form
+   ---------------------------------------------------------
+   On submit:
+   1. If JSONBIN_BIN_ID / JSONBIN_MASTER_KEY are set in
+      config.js, the lead is appended to that JSONBin bin.
+   2. Otherwise, the lead is opened as a pre-filled WhatsApp
+      message instead, so the form always works.
+   ========================================================= */
+
+const form = document.getElementById("lead-form");
+const submitBtn = document.getElementById("submit-btn");
+const statusEl = document.getElementById("form-status");
+
+function jsonbinConfigured() {
+  return JSONBIN_BIN_ID && JSONBIN_MASTER_KEY &&
+    JSONBIN_BIN_ID !== "YOUR_BIN_ID" && JSONBIN_MASTER_KEY !== "YOUR_MASTER_KEY";
+}
+
+async function saveToJsonBin(lead) {
+  const readUrl = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`;
+  const writeUrl = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+
+  const readRes = await fetch(readUrl, {
+    headers: { "X-Master-Key": JSONBIN_MASTER_KEY }
+  });
+  if (!readRes.ok) throw new Error("Could not read bin");
+  const readData = await readRes.json();
+  const existing = Array.isArray(readData.record) ? readData.record : [];
+
+  existing.push(lead);
+
+  const writeRes = await fetch(writeUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Master-Key": JSONBIN_MASTER_KEY
+    },
+    body: JSON.stringify(existing)
+  });
+  if (!writeRes.ok) throw new Error("Could not write to bin");
+}
+
+function openWhatsAppFallback(lead) {
+  const lines = [
+    "Hi DISCIPL Screens, here's my requirement:",
+    `Business: ${lead.business}`,
+    `Contact: ${lead.contact}`,
+    `Phone: ${lead.phone}`,
+    lead.email ? `Email: ${lead.email}` : "",
+    lead.message ? `Requirement: ${lead.message}` : ""
+  ].filter(Boolean);
+  const text = encodeURIComponent(lines.join("\n"));
+  window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${text}`, "_blank");
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const lead = {
+    business: document.getElementById("l-business").value.trim(),
+    contact: document.getElementById("l-contact").value.trim(),
+    phone: document.getElementById("l-phone").value.trim(),
+    email: document.getElementById("l-email").value.trim(),
+    message: document.getElementById("l-message").value.trim(),
+    submittedAt: new Date().toISOString()
+  };
+
+  submitBtn.disabled = true;
+  statusEl.textContent = "Sending…";
+  statusEl.className = "form-status";
+
+  try {
+    if (jsonbinConfigured()) {
+      await saveToJsonBin(lead);
+      statusEl.textContent = "Thanks — we've received your requirement and will be in touch shortly.";
+      statusEl.className = "form-status ok";
+      form.reset();
+    } else {
+      openWhatsAppFallback(lead);
+      statusEl.textContent = "Opening WhatsApp to send your requirement…";
+      statusEl.className = "form-status ok";
+    }
+  } catch (err) {
+    statusEl.textContent = "Something went wrong saving your details. Opening WhatsApp instead…";
+    statusEl.className = "form-status err";
+    openWhatsAppFallback(lead);
+  } finally {
+    submitBtn.disabled = false;
+  }
+});

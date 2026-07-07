@@ -1,0 +1,95 @@
+/* =========================================================
+   DISCIPL SCREENS — pricing logic
+   ---------------------------------------------------------
+   Rate curve: ₹2,500 / screen / month at the smallest
+   commitment (1 screen, 1 month), sliding down to
+   ₹600 / screen / month at the largest (15 screens, 12
+   months = ₹1,08,000 total). The rate is driven by total
+   "screen-months" (screens × months) on a log curve, so
+   committing to more screens OR more months both help.
+   ========================================================= */
+
+const BASE_RATE = 2500;   // rate at 1 screen-month
+const FLOOR_RATE = 600;   // rate at 180 screen-months (15 x 12)
+const MAX_SCREEN_MONTHS = 15 * 12;
+const DECAY = (BASE_RATE - FLOOR_RATE) / Math.log(MAX_SCREEN_MONTHS);
+
+function getRate(screens, months) {
+  const screenMonths = screens * months;
+  if (screenMonths <= 1) return BASE_RATE;
+  const raw = BASE_RATE - DECAY * Math.log(screenMonths);
+  const rounded = Math.round(raw / 10) * 10;
+  return Math.max(FLOOR_RATE, rounded);
+}
+
+function formatINR(n) {
+  return "₹" + Math.round(n).toLocaleString("en-IN");
+}
+
+const screensSlider = document.getElementById("screens-slider");
+const monthsSlider = document.getElementById("months-slider");
+const screensValue = document.getElementById("screens-value");
+const monthsValue = document.getElementById("months-value");
+const rateOut = document.getElementById("rate-out");
+const totalOut = document.getElementById("total-out");
+const breakdownOut = document.getElementById("breakdown-out");
+const saveOut = document.getElementById("save-out");
+const liCreatives = document.getElementById("li-creatives");
+const liExclusivity = document.getElementById("li-exclusivity");
+const brandNameInput = document.getElementById("brand-name");
+const sectorSelect = document.getElementById("sector");
+const needHelpCheckbox = document.getElementById("need-help");
+const whatsappBtn = document.getElementById("whatsapp-btn");
+
+function render() {
+  const screens = parseInt(screensSlider.value, 10);
+  const months = parseInt(monthsSlider.value, 10);
+
+  screensValue.textContent = screens;
+  monthsValue.textContent = months;
+
+  const rate = getRate(screens, months);
+  const total = rate * screens * months;
+  const baseTotal = BASE_RATE * screens * months;
+  const savings = baseTotal - total;
+
+  rateOut.textContent = formatINR(rate);
+  totalOut.textContent = formatINR(total);
+  breakdownOut.textContent = `${screens} screen${screens > 1 ? "s" : ""} x ${months} month${months > 1 ? "s" : ""}`;
+  saveOut.textContent = savings > 0 ? `Save ${formatINR(savings)}` : "";
+
+  const creativesUnlocked = months >= 2;
+  const exclusivityUnlocked = months >= 4;
+
+  liCreatives.classList.toggle("locked", !creativesUnlocked);
+  liExclusivity.classList.toggle("locked", !exclusivityUnlocked);
+}
+
+screensSlider.addEventListener("input", render);
+monthsSlider.addEventListener("input", render);
+
+whatsappBtn.addEventListener("click", () => {
+  const brand = brandNameInput.value.trim() || "Not specified";
+  const sector = sectorSelect.value || "Not specified";
+  const screens = parseInt(screensSlider.value, 10);
+  const months = parseInt(monthsSlider.value, 10);
+  const rate = getRate(screens, months);
+  const total = rate * screens * months;
+  const needHelp = needHelpCheckbox.checked;
+
+  const lines = [
+    "Hi DISCIPL Screens, I'd like a quote:",
+    `Brand: ${brand}`,
+    `Sector: ${sector}`,
+    `Screens: ${screens}`,
+    `Duration: ${months} month(s)`,
+    `Rate: ${formatINR(rate)} / screen / month`,
+    `Total: ${formatINR(total)}`,
+    needHelp ? "I also need help designing my ad creative." : ""
+  ].filter(Boolean);
+
+  const text = encodeURIComponent(lines.join("\n"));
+  window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${text}`, "_blank");
+});
+
+render();

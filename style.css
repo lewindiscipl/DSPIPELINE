@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Our Screens — DISCIPL Screens</title>
+<link rel="icon" href="assets/logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand-mark" href="index.html">
+      <img src="assets/logo.png" alt="DISCIPL Screens">
+    </a>
+    <nav class="main-nav">
+      <a href="index.html">Home</a>
+      <a href="screens.html" class="active">Our Screens</a>
+      <a href="pricing.html">Pricing</a>
+      <a href="sales.html">Sales</a>
+    </nav>
+  </div>
+</header>
+
+<section class="wrap">
+  <div class="page-head">
+    <p class="eyebrow">The network</p>
+    <h1>15 screens, live across Kozhikode.</h1>
+    <p>Every location below is an active gym floor — the exact environment where your audience is focused, present, and returning daily.</p>
+  </div>
+
+  <div class="stat-strip">
+    <div class="stat"><div class="num" id="stat-screens">15</div><div class="label">Active screens</div></div>
+    <div class="stat"><div class="num" id="stat-localities">11</div><div class="label">Localities covered</div></div>
+    <div class="stat"><div class="num">Daily</div><div class="label">Content refresh</div></div>
+  </div>
+
+  <div class="screens-grid" id="screens-grid"></div>
+</section>
+
+<footer>
+  <div class="wrap">
+    © DISCIPL Screens · A <span style="color:var(--text)">HABITOZ PRIVATE LIMITED</span> brand ·
+    <span class="phone">+91 97464 88282</span>
+  </div>
+</footer>
+
+<script src="data.js"></script>
+<script>
+  const grid = document.getElementById('screens-grid');
+  SCREENS.forEach((s, i) => {
+    const el = document.createElement('div');
+    el.className = 'screen-card';
+    el.innerHTML = `
+      <div class="idx">SCR-${String(i + 1).padStart(2, '0')}</div>
+      <h4>${s.name}</h4>
+      <div class="locality"><span class="arrow" style="border-left-color: var(--red);"></span>${s.locality}</div>
+    `;
+    grid.appendChild(el);
+  });
+
+  const localities = new Set(SCREENS.map(s => s.locality));
+  document.getElementById('stat-screens').textContent = SCREENS.length;
+  document.getElementById('stat-localities').textContent = localities.size;
+</script>
+
+</body>
+</html>

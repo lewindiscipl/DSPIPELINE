@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales — DISCIPL Screens</title>
+<link rel="icon" href="assets/logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand-mark" href="index.html">
+      <img src="assets/logo.png" alt="DISCIPL Screens">
+    </a>
+    <nav class="main-nav">
+      <a href="index.html">Home</a>
+      <a href="screens.html">Our Screens</a>
+      <a href="pricing.html">Pricing</a>
+      <a href="sales.html" class="active">Sales</a>
+    </nav>
+  </div>
+</header>
+
+<section class="wrap">
+  <div class="page-head">
+    <p class="eyebrow">Talk to us</p>
+    <h1>Tell us what you need. We'll take it from there.</h1>
+    <p>Leave your details and requirement below — our team will follow up directly.</p>
+  </div>
+
+  <div class="sales-layout">
+    <form class="sales-form" id="lead-form">
+      <div class="field">
+        <label for="l-business">Business Name *</label>
+        <input type="text" id="l-business" required>
+      </div>
+      <div class="field">
+        <label for="l-contact">Contact Person *</label>
+        <input type="text" id="l-contact" required>
+      </div>
+      <div class="field">
+        <label for="l-phone">Phone *</label>
+        <input type="text" id="l-phone" required>
+      </div>
+      <div class="field">
+        <label for="l-email">Email</label>
+        <input type="text" id="l-email">
+      </div>
+      <div class="field">
+        <label for="l-message">What are you looking for?</label>
+        <textarea id="l-message" placeholder="Number of screens, campaign length, sector, timelines…"></textarea>
+      </div>
+      <button type="submit" class="submit-btn" id="submit-btn">Send Requirement</button>
+      <div class="form-status" id="form-status"></div>
+    </form>
+
+    <div class="sales-info">
+      <h3>Prefer a quicker route?</h3>
+      <p>Reach us directly and we'll respond the same day.</p>
+      <div class="contact-line"><span class="arrow" style="color:var(--red);"></span> +91 97464 88282</div>
+      <div class="contact-line"><span class="arrow" style="color:var(--red);"></span> DISCIPL Screens, Kozhikode</div>
+      <p style="margin-top:24px;">Or build your own quote first on the <a href="pricing.html" style="color:var(--red);">Pricing page</a> and send it straight to WhatsApp.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    © DISCIPL Screens · A <span style="color:var(--text)">HABITOZ PRIVATE LIMITED</span> brand ·
+    <span class="phone">+91 97464 88282</span>
+  </div>
+</footer>
+
+<script src="config.js"></script>
+<script src="sales.js"></script>
+</body>
+</html>
