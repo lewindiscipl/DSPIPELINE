@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DISCIPL Screens — Sales Pipeline</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Archivo:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; font-family:'Archivo',sans-serif; background:#F7F4EE; }
+  .discipl-h { font-family:'Oswald',sans-serif; letter-spacing:0.01em; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+
+const { useState, useEffect, useRef } = React;
+
+const STAGES = ["Lead sourced","Contacted","Call booked","Pitched","Quotation sent","Negotiation","Closed won","Closed lost"];
+
+const STAGE_COLORS = {
+  "Lead sourced": { bg:"#F1EFE8", border:"#B4B2A9", text:"#444441" },
+  "Contacted": { bg:"#E6F1FB", border:"#85B7EB", text:"#0C447C" },
+  "Call booked": { bg:"#FBEAF0", border:"#ED93B1", text:"#72243E" },
+  "Pitched": { bg:"#FAEEDA", border:"#EF9F27", text:"#633806" },
+  "Quotation sent": { bg:"#FAECE7", border:"#F0997B", text:"#712B13" },
+  "Negotiation": { bg:"#EEEDFE", border:"#AFA9EC", text:"#3C3489" },
+  "Closed won": { bg:"#EAF3DE", border:"#97C459", text:"#27500A" },
+  "Closed lost": { bg:"#FCEBEB", border:"#F09595", text:"#791F1F" },
+};
+
+const SOURCES = ["Cold call","Walk-in","Instagram DM","Referral","Inbound","Gym intro","Other"];
+const OWNERS = ["Lewin","Shahim","New hire 1","New hire 2"];
+
+const BRAND_RED = "#D85A30";
+const BRAND_BLACK = "#1C1C1A";
+const BRAND_CREAM = "#F7F4EE";
+
+const JSONBIN_ID = "6a4ca6dfda38895dfe3948fe";
+const JSONBIN_KEY = "$2a$10$fg29d2.cYkF.Xudjhyrh3uaUT.CxquLYjFyO5nnHuUhgsqVx1CdmO";
+const JSONBIN_BASE = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
+
+async function fetchLeads() {
+  const res = await fetch(`${JSONBIN_BASE}/latest`, { headers: { "X-Master-Key": JSONBIN_KEY } });
+  if (!res.ok) throw new Error("fetch failed");
+  const data = await res.json();
+  return Array.isArray(data && data.record && data.record.leads) ? data.record.leads : [];
+}
+
+async function saveLeads(leads) {
+  const res = await fetch(JSONBIN_BASE, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "X-Master-Key": JSONBIN_KEY },
+    body: JSON.stringify({ leads }),
+  });
+  if (!res.ok) throw new Error("save failed");
+}
+
+function emptyLead() {
+  return {
+    id: `lead_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+    brand:"", contact_person:"", phone:"", source:"Cold call", stage:"Lead sourced",
+    screens_requested:"", months:"", quoted_value:"", next_followup:"",
+    owner:"Lewin", last_contact:new Date().toISOString().slice(0,10), notes:"",
+  };
+}
+
+function isStale(lead) {
+  if (lead.stage === "Closed won" || lead.stage === "Closed lost") return false;
+  if (!lead.last_contact) return true;
+  const days = (Date.now() - new Date(lead.last_contact).getTime()) / 86400000;
+  return days > 14;
+}
+
+function StatCard({ label, value, warn }) {
+  return (
+    <div className="rounded p-3" style={{ background:"#fff", border:`1px solid ${warn ? "#F09595" : "#D3D1C7"}` }}>
+      <div style={{ fontSize:"11px", color:"#888780", textTransform:"uppercase", letterSpacing:"0.03em" }}>{label}</div>
+      <div className="discipl-h" style={{ fontSize:"24px", fontWeight:600, color: warn ? "#791F1F" : BRAND_BLACK, marginTop:"2px" }}>{value}</div>
+    </div>
+  );
+}
+
+function LeadCard({ lead, colors, onDragStart, onDragEnd, updateLead, deleteLead }) {
+  const stale = isStale(lead);
+  return (
+    <div draggable onDragStart={onDragStart} onDragEnd={onDragEnd}
+      className="rounded mb-2 p-2" style={{ background: colors.bg, border:`1px solid ${stale ? "#E24B4A" : colors.border}`, cursor:"grab" }}>
+      <div className="flex items-start justify-between gap-1">
+        <input value={lead.brand} placeholder="Brand name" onChange={(e)=>updateLead(lead.id,"brand",e.target.value)}
+          className="bg-transparent outline-none w-full" style={{ fontSize:"13px", fontWeight:500, color: colors.text }} />
+        <button onClick={()=>deleteLead(lead.id)} aria-label="Delete lead" style={{ color:"#888780" }}>✕</button>
+      </div>
+      <div className="flex items-center justify-between mt-1">
+        <span style={{ fontSize:"11px", color:"#5F5E5A" }}>{lead.screens_requested ? `${lead.screens_requested} screens` : ""}</span>
+        {stale && <span style={{ fontSize:"10px", color:"#A32D2D" }}>● stale</span>}
+      </div>
+      <input type="date" value={lead.next_followup} onChange={(e)=>updateLead(lead.id,"next_followup",e.target.value)}
+        className="bg-transparent outline-none mt-1 w-full" style={{ fontSize:"11px", color:"#5F5E5A" }} />
+    </div>
+  );
+}
+
+function BoardView({ leads, updateLead, deleteLead, draggingId, setDraggingId }) {
+  function onDrop(stage) { if (draggingId) { updateLead(draggingId,"stage",stage); setDraggingId(null); } }
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-2">
+      {STAGES.map((stage) => {
+        const colOf = leads.filter((l)=>l.stage===stage);
+        const colors = STAGE_COLORS[stage];
+        return (
+          <div key={stage} onDragOver={(e)=>e.preventDefault()} onDrop={()=>onDrop(stage)} style={{ minWidth:"230px", width:"230px", flexShrink:0 }}>
+            <div className="flex items-center justify-between mb-2 px-1">
+              <span className="discipl-h" style={{ fontSize:"13px", fontWeight:600, color: colors.text }}>{stage}</span>
+              <span style={{ fontSize:"11px", color:"#888780" }}>{colOf.length}</span>
+            </div>
+            <div className="rounded" style={{ background:"#EDEAE1", minHeight:"80px", padding:"6px" }}>
+              {colOf.map((lead)=>(
+                <LeadCard key={lead.id} lead={lead} colors={colors}
+                  onDragStart={()=>setDraggingId(lead.id)} onDragEnd={()=>setDraggingId(null)}
+                  updateLead={updateLead} deleteLead={deleteLead} />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const TABLE_COLS = [
+  { key:"brand", label:"Brand", type:"text" },
+  { key:"contact_person", label:"Contact", type:"text" },
+  { key:"phone", label:"Phone", type:"text" },
+  { key:"source", label:"Source", type:"select", options:SOURCES },
+  { key:"stage", label:"Stage", type:"select", options:STAGES },
+  { key:"screens_requested", label:"Screens", type:"number" },
+  { key:"months", label:"Months", type:"number" },
+  { key:"quoted_value", label:"Quoted ₹", type:"number" },
+  { key:"next_followup", label:"Follow-up", type:"date" },
+  { key:"owner", label:"Owner", type:"select", options:OWNERS },
+  { key:"last_contact", label:"Last contact", type:"date" },
+  { key:"notes", label:"Notes", type:"text" },
+];
+
+function TableView({ leads, updateLead, deleteLead }) {
+  return (
+    <div className="overflow-x-auto rounded" style={{ border:"1px solid #D3D1C7" }}>
+      <table className="w-full" style={{ borderCollapse:"collapse", fontSize:"12px" }}>
+        <thead>
+          <tr style={{ background: BRAND_BLACK }}>
+            {TABLE_COLS.map((col)=>(
+              <th key={col.key} className="text-left px-2 py-2" style={{ color:BRAND_CREAM, fontWeight:500, whiteSpace:"nowrap" }}>{col.label}</th>
+            ))}
+            <th style={{ width:"32px" }}></th>
+          </tr>
+        </thead>
+        <tbody>
+          {leads.map((lead,i)=>{
+            const colors = STAGE_COLORS[lead.stage];
+            return (
+              <tr key={lead.id} style={{ background: i%2===0 ? "#fff" : "#F7F4EE" }}>
+                {TABLE_COLS.map((col)=>(
+                  <td key={col.key} className="px-1 py-1" style={{ borderTop:"1px solid #EDEAE1" }}>
+                    {col.type==="select" ? (
+                      <select value={lead[col.key]} onChange={(e)=>updateLead(lead.id,col.key,e.target.value)}
+                        className="bg-transparent outline-none w-full px-1 py-0.5 rounded"
+                        style={col.key==="stage" ? { background:colors.bg, color:colors.text } : {}}>
+                        {col.options.map((o)=>(<option key={o} value={o}>{o}</option>))}
+                      </select>
+                    ) : (
+                      <input type={col.type} value={lead[col.key]} onChange={(e)=>updateLead(lead.id,col.key,e.target.value)}
+                        className="bg-transparent outline-none w-full px-1 py-0.5" style={{ minWidth: col.key==="notes" ? "160px" : "70px" }} />
+                    )}
+                  </td>
+                ))}
+                <td><button onClick={()=>deleteLead(lead.id)} aria-label="Delete lead" style={{ color:"#888780" }}>✕</button></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {leads.length===0 && <div className="text-center py-8" style={{ color:"#888780", fontSize:"13px" }}>No leads yet — add your first one above.</div>}
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span style={{ fontSize:"11px", color:"#5F5E5A" }}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function AddLeadModal({ onClose, onAdd }) {
+  const [draft, setDraft] = useState(emptyLead());
+  function set(field, value) { setDraft((d)=>({ ...d, [field]: value })); }
+  return (
+    <div className="flex items-center justify-center" style={{ position:"fixed", inset:0, background:"rgba(28,28,26,0.5)", zIndex:50 }}>
+      <div className="rounded p-5" style={{ background:"#fff", width:"min(90vw, 420px)", maxHeight:"85vh", overflowY:"auto" }}>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="discipl-h" style={{ fontSize:"16px", fontWeight:600 }}>Add lead</h2>
+          <button onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Field label="Brand name *"><input autoFocus value={draft.brand} onChange={(e)=>set("brand",e.target.value)} className="w-full px-2 py-1.5 rounded" style={{ border:"1px solid #D3D1C7" }} /></Field>
+          <Field label="Contact person"><input value={draft.contact_person} onChange={(e)=>set("contact_person",e.target.value)} className="w-full px-2 py-1.5 rounded" style={{ border:"1px solid #D3D1C7" }} /></Field>
+          <Field label="Phone / WhatsApp"><input value={draft.phone} onChange={(e)=>set("phone",e.target.value)} className="w-full px-2 py-1.5 rounded" style={{ border:"1px solid #D3D1C7" }} /></Field>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Source">
+              <select value={draft.source} onChange={(e)=>set("source",e.target.value)} className="w-full px-2 py-1.5 rounded" style={{ border:"1px solid #D3D1C7" }}>
+                {SOURCES.map((s)=>(<option key={s} value={s}>{s}</option>))}
+              </select>
+            </Field>
+            <Field label="Owner">
+              <select value={draft.owner} onChange={(e)=>set("owner",e.target.value)} className="w-full px-2 py-1.5 rounded" style={{ border:"1px solid #D3D1C7" }}>
+                {OWNERS.map((o)=>(<option key={o} value={o}>{o}</option>))}
+              </select>
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Screens requested"><input type="number" value={draft.screens_requested} onChange={(e)=>set("screens_requested",e.target.value)} className="w-full px-2 py-1.5 rounded" style={{ border:"1px solid #D3D1C7" }} /></Field>
+            <Field label="Months"><input type="number" value={draft.months} onChange={(e)=>set("months",e.target.value)} className="w-full px-2 py-1.5 rounded" style={{ border:"1px solid #D3D1C7" }} /></Field>
+          </div>
+          <Field label="Next follow-up"><input type="date" value={draft.next_followup} onChange={(e)=>set("next_followup",e.target.value)} className="w-full px-2 py-1.5 rounded" style={{ border:"1px solid #D3D1C7" }} /></Field>
+          <Field label="Notes"><textarea value={draft.notes} onChange={(e)=>set("notes",e.target.value)} rows={2} className="w-full px-2 py-1.5 rounded" style={{ border:"1px solid #D3D1C7" }} /></Field>
+        </div>
+        <div className="flex justify-end gap-2 mt-4">
+          <button onClick={onClose} className="px-3 py-1.5 rounded text-sm" style={{ border:"1px solid #D3D1C7" }}>Cancel</button>
+          <button disabled={!draft.brand.trim()} onClick={()=>onAdd(draft)} className="px-3 py-1.5 rounded text-sm" style={{ background: draft.brand.trim() ? BRAND_RED : "#D3D1C7", color:"#fff" }}>Add lead</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [leads, setLeads] = useState(null);
+  const [view, setView] = useState("board");
+  const [showAdd, setShowAdd] = useState(false);
+  const [draggingId, setDraggingId] = useState(null);
+  const [saveState, setSaveState] = useState("idle");
+  const saveTimer = useRef(null);
+  const loadedOnce = useRef(false);
+
+  useEffect(() => {
+    (async () => {
+      try { const parsed = await fetchLeads(); setLeads(parsed); setSaveState("saved"); }
+      catch(e) { setLeads([]); setSaveState("error"); }
+      loadedOnce.current = true;
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!loadedOnce.current || leads === null) return;
+    setSaveState("saving");
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try { await saveLeads(leads); setSaveState("saved"); }
+      catch(e) { setSaveState("error"); }
+    }, 600);
+    return () => clearTimeout(saveTimer.current);
+  }, [leads]);
+
+  function updateLead(id, field, value) { setLeads((prev)=>prev.map((l)=> l.id===id ? { ...l, [field]: value } : l)); }
+  function deleteLead(id) { setLeads((prev)=>prev.filter((l)=>l.id!==id)); }
+  function addLead(lead) { setLeads((prev)=>[...prev, lead]); }
+
+  if (leads === null) {
+    return <div className="flex items-center justify-center" style={{ minHeight:"300px" }}><div style={{ color:"#888780", fontSize:"14px" }}>Loading pipeline…</div></div>;
+  }
+
+  const active = leads.filter((l)=> l.stage!=="Closed won" && l.stage!=="Closed lost");
+  const wonThisMonth = leads.filter((l)=>{
+    if (l.stage!=="Closed won" || !l.last_contact) return false;
+    const d = new Date(l.last_contact); const now = new Date();
+    return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+  });
+  const won = leads.filter((l)=>l.stage==="Closed won").length;
+  const lost = leads.filter((l)=>l.stage==="Closed lost").length;
+  const winRate = won+lost>0 ? Math.round((won/(won+lost))*100) : null;
+  const noFollowup = active.filter((l)=>!l.next_followup).length;
+
+  return (
+    <div style={{ background:BRAND_CREAM, color:BRAND_BLACK, minHeight:"100vh" }}>
+      <div className="px-6 py-5" style={{ borderBottom:`2px solid ${BRAND_BLACK}` }}>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="discipl-h" style={{ fontSize:"22px", fontWeight:600, color:BRAND_BLACK }}>
+              DISCIPL Screens <span style={{ color:BRAND_RED }}>— sales pipeline</span>
+            </h1>
+            <p style={{ fontSize:"13px", color:"#5F5E5A", marginTop:"2px" }}>
+              {saveState==="saving" ? "Saving…" : saveState==="error" ? "Save failed — check connection" : "All changes saved"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex rounded overflow-hidden" style={{ border:`1px solid ${BRAND_BLACK}` }}>
+              <button onClick={()=>setView("board")} className="px-3 py-1.5 text-sm" style={{ background: view==="board" ? BRAND_BLACK : "transparent", color: view==="board" ? BRAND_CREAM : BRAND_BLACK }}>Board</button>
+              <button onClick={()=>setView("table")} className="px-3 py-1.5 text-sm" style={{ background: view==="table" ? BRAND_BLACK : "transparent", color: view==="table" ? BRAND_CREAM : BRAND_BLACK }}>Table</button>
+            </div>
+            <button onClick={()=>setShowAdd(true)} className="px-3 py-1.5 text-sm rounded" style={{ background:BRAND_RED, color:"#fff" }}>+ Add lead</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard label="Active leads" value={active.length} />
+        <StatCard label="Closed won (this month)" value={wonThisMonth.length} />
+        <StatCard label="Win rate" value={winRate===null ? "—" : `${winRate}%`} />
+        <StatCard label="No follow-up set" value={noFollowup} warn={noFollowup>0} />
+      </div>
+
+      <div className="px-6 pb-8">
+        {view==="board"
+          ? <BoardView leads={leads} updateLead={updateLead} deleteLead={deleteLead} draggingId={draggingId} setDraggingId={setDraggingId} />
+          : <TableView leads={leads} updateLead={updateLead} deleteLead={deleteLead} />}
+      </div>
+
+      {showAdd && <AddLeadModal onClose={()=>setShowAdd(false)} onAdd={(l)=>{ addLead(l); setShowAdd(false); }} />}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+
+</script>
+</body>
+</html>
